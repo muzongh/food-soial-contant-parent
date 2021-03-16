@@ -2,8 +2,10 @@ package com.mzh.seckill.service;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.util.StrUtil;
 import com.mzh.commons.constant.ApiConstant;
 import com.mzh.commons.constant.RedisKeyConstant;
+import com.mzh.commons.exception.ParameterException;
 import com.mzh.commons.model.domain.ResultInfo;
 import com.mzh.commons.model.pojo.SeckillVouchers;
 import com.mzh.commons.model.pojo.VoucherOrders;
@@ -12,11 +14,13 @@ import com.mzh.commons.utils.AssertUtil;
 import com.mzh.commons.utils.ResultInfoUtil;
 import com.mzh.seckill.mapper.SeckillVouchersMapper;
 import com.mzh.seckill.mapper.VoucherOrdersMapper;
+import com.mzh.seckill.model.RedisLock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.web.client.RestTemplate;
 
 import javax.annotation.Resource;
@@ -47,6 +51,9 @@ public class SeckillService {
     @Resource
     private DefaultRedisScript defaultRedisScript;
 
+    @Resource
+    private RedisLock redisLock;
+
     /**
      * 抢购代金券
      *
@@ -55,6 +62,7 @@ public class SeckillService {
      * @param path 访问路径
      * @return
      */
+    @Transactional(rollbackFor = Exception.class)
     public ResultInfo doSeckill(Integer voucherId,String accessToken,String path){
         //基本参数校验
         AssertUtil.isTrue(voucherId == null  || voucherId<0,"请选择需要抢购的代金券");
@@ -87,7 +95,7 @@ public class SeckillService {
                 new SignInDinerInfo(), false);
         //判断登陆用户是否已抢到
         VoucherOrders dinerOrder = voucherOrdersMapper.findDinerOrder(signInDinerInfo.getId(),
-                seckillVouchers.getId());
+                seckillVouchers.getFkVoucherId());
         AssertUtil.isTrue(dinerOrder!=null,"您已有此优惠券，无需再次抢购");
 
         //扣库存
@@ -99,25 +107,44 @@ public class SeckillService {
 //        Long count = redisTemplate.opsForHash().increment(key, "amount", -1);
 //        AssertUtil.isTrue(count < 0 ,"该券已被抢购完");
 
-        //采用redis+lua
-        List<String> keys=new ArrayList<>();
-        keys.add(key);
-        keys.add("amount");
-        Long amount = (Long) redisTemplate.execute(defaultRedisScript, keys);
-        AssertUtil.isTrue(amount==null || amount<1,"该券已被抢购完");
+        String lockName=RedisKeyConstant.lock_key.getKey() +
+                signInDinerInfo.getId() + ":" +voucherId;
+        Long expireTime  = seckillVouchers.getEndTime().getTime()  - now.getTime();
+        //使用redis 锁一个账号只能买一次
+        String lockKey = redisLock.tryLock(lockName, expireTime);
+        try {
+            //不为空意味着拿到锁了
+            if (StrUtil.isNotBlank(lockKey)){
+                //下单
+                VoucherOrders voucherOrders = new VoucherOrders();
+                voucherOrders.setFkDinerId(signInDinerInfo.getId());
+                //redis不需要维护外键信息
+                //voucherOrders.setFkSeckillId(seckillVouchers.getId());
+                voucherOrders.setFkVoucherId(seckillVouchers.getFkVoucherId());
+                String orderNo = IdUtil.getSnowflake(1, 1).nextIdStr();
+                voucherOrders.setOrderNo(orderNo);
+                voucherOrders.setOrderType(1);
+                voucherOrders.setStatus(0);
+                int save = voucherOrdersMapper.save(voucherOrders);
+                AssertUtil.isTrue(save==0,"抢购失败，请稍后重试");
 
-        //下单
-        VoucherOrders voucherOrders = new VoucherOrders();
-        voucherOrders.setFkDinerId(signInDinerInfo.getId());
-        //redis不需要维护外键信息
-//        voucherOrders.setFkSeckillId(seckillVouchers.getId());
-        voucherOrders.setFkVoucherId(seckillVouchers.getFkVoucherId());
-        String orderNo = IdUtil.getSnowflake(1, 1).nextIdStr();
-        voucherOrders.setOrderNo(orderNo);
-        voucherOrders.setOrderType(1);
-        voucherOrders.setStatus(0);
-        int save = voucherOrdersMapper.save(voucherOrders);
-        AssertUtil.isTrue(save==0,"抢购失败，请稍后重试");
+                //采用redis+lua
+                List<String> keys=new ArrayList<>();
+                keys.add(key);
+                keys.add("amount");
+                Long amount = (Long) redisTemplate.execute(defaultRedisScript, keys);
+                AssertUtil.isTrue(amount==null || amount<1,"该券已被抢购完");
+            }
+        } catch (Exception e) {
+            //手动回滚事务
+            //TODO 报错org.springframework.transaction.NoTransactionException: No transaction aspect-managed TransactionStatus in scope未解决
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            //解锁
+            redisLock.unlock(lockName,lockKey);
+            if (e instanceof ParameterException){
+                return ResultInfoUtil.buildError(0,"该券已经卖完了",path);
+            }
+        }
 
         return ResultInfoUtil.buildSuccess(path,"抢购成功");
     }

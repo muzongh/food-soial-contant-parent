@@ -28,7 +28,7 @@ public class SeckillController {
      * @param access_token
      * @return
      */
-    @PostMapping("voucherId")
+    @PostMapping("{voucherId}")
     public ResultInfo<String> doSeckill(@PathVariable Integer voucherId,String access_token){
         ResultInfo resultInfo = seckillService.doSeckill(voucherId, access_token, httpServletRequest.getServletPath());
         return resultInfo;
