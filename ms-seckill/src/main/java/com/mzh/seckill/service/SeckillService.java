@@ -15,6 +15,8 @@ import com.mzh.commons.utils.ResultInfoUtil;
 import com.mzh.seckill.mapper.SeckillVouchersMapper;
 import com.mzh.seckill.mapper.VoucherOrdersMapper;
 import com.mzh.seckill.model.RedisLock;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -25,6 +27,7 @@ import org.springframework.web.client.RestTemplate;
 
 import javax.annotation.Resource;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 秒杀业务逻辑层
@@ -53,6 +56,9 @@ public class SeckillService {
 
     @Resource
     private RedisLock redisLock;
+
+    @Resource
+    private RedissonClient redissonClient;
 
     /**
      * 抢购代金券
@@ -103,18 +109,25 @@ public class SeckillService {
        /* int count=seckillVouchersMapper.stockDecrease(seckillVouchers.getId());
         AssertUtil.isTrue(count == 0 ,"该券已被抢购完");*/
 
-       //采用redis
-//        Long count = redisTemplate.opsForHash().increment(key, "amount", -1);
-//        AssertUtil.isTrue(count < 0 ,"该券已被抢购完");
+        //采用redis
+        //Long count = redisTemplate.opsForHash().increment(key, "amount", -1);
+        //AssertUtil.isTrue(count < 0 ,"该券已被抢购完");
 
         String lockName=RedisKeyConstant.lock_key.getKey() +
                 signInDinerInfo.getId() + ":" +voucherId;
         Long expireTime  = seckillVouchers.getEndTime().getTime()  - now.getTime();
         //使用redis 锁一个账号只能买一次
-        String lockKey = redisLock.tryLock(lockName, expireTime);
+        //使用自定义redis锁
+//        String lockKey = redisLock.tryLock(lockName, expireTime);
+        //redis分布式锁
+        RLock lock = redissonClient.getLock(lockName);
         try {
             //不为空意味着拿到锁了
-            if (StrUtil.isNotBlank(lockKey)){
+            //自定义redis锁
+//            if (StrUtil.isNotBlank(lockKey)){
+            //Redisson 分布式锁
+            boolean isLocked = lock.tryLock(expireTime, TimeUnit.MILLISECONDS);
+            if (isLocked){
                 //下单
                 VoucherOrders voucherOrders = new VoucherOrders();
                 voucherOrders.setFkDinerId(signInDinerInfo.getId());
@@ -140,7 +153,8 @@ public class SeckillService {
             //TODO 报错org.springframework.transaction.NoTransactionException: No transaction aspect-managed TransactionStatus in scope未解决
             TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             //解锁
-            redisLock.unlock(lockName,lockKey);
+//            redisLock.unlock(lockName,lockKey);
+            lock.unlock();
             if (e instanceof ParameterException){
                 return ResultInfoUtil.buildError(0,"该券已经卖完了",path);
             }
