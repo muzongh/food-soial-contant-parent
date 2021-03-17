@@ -14,6 +14,7 @@
         <module name="ms-gateway" />
         <module name="ms-follow" />
         <module name="ms-oauth2-server" />
+        <module name="ms-feeds" />
       </profile>
     </annotationProcessing>
   </component>

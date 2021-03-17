@@ -43,6 +43,19 @@ public class FollowService {
     private RedisTemplate redisTemplate;
 
     /**
+     * 获取粉丝ID列表
+     *
+     * @param dinerId
+     * @return
+     */
+    public Set<Integer> findFollowerIds(Integer dinerId){
+
+        AssertUtil.isTrue(dinerId== null,"请选择要查看的用户");
+        Set<Integer> members = redisTemplate.opsForSet().members(RedisKeyConstant.followers.getKey() + dinerId);
+        return members;
+    }
+
+    /**
      * 共同关注列表
      *
      * @param dinerId

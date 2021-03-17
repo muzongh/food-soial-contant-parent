@@ -1,6 +1,7 @@
 package com.mzh.follow.controller;
 
 import com.mzh.commons.model.domain.ResultInfo;
+import com.mzh.commons.utils.ResultInfoUtil;
 import com.mzh.follow.service.FollowService;
 import org.springframework.web.bind.annotation.*;
 
@@ -61,6 +62,17 @@ public class FollowController {
     @PostMapping("followingOrFollowerList")
     public ResultInfo followingOrFollowerList(String access_token,String followType){
         return followService.followingOrFollowerList(access_token,request.getServletPath(),followType);
+    }
+
+    /**
+     * 获取粉丝ID列表
+     *
+     * @param dinerId
+     * @return
+     */
+    @GetMapping("findFollowerIds/{dinerId}")
+    public ResultInfo findFollowerIds(@PathVariable Integer dinerId){
+        return ResultInfoUtil.buildSuccess(request.getServletPath(),followService.findFollowerIds(dinerId));
     }
 
 }
