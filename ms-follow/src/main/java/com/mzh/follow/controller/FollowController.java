@@ -16,7 +16,7 @@ public class FollowController {
 
     @Resource
     private FollowService followService;
-    
+
     @Resource
     private HttpServletRequest request;
 

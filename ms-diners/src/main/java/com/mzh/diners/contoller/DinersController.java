@@ -2,6 +2,7 @@ package com.mzh.diners.contoller;
 
 import com.mzh.commons.model.domain.ResultInfo;
 import com.mzh.commons.model.dto.DinersDTO;
+import com.mzh.commons.model.vo.ShortDinerInfo;
 import com.mzh.commons.utils.ResultInfoUtil;
 import com.mzh.diners.service.DinersService;
 import io.swagger.annotations.Api;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 @RestController
 @Api(tags = "食客相关接口")
@@ -20,6 +22,18 @@ public class DinersController {
 
     @Resource
     private HttpServletRequest request;
+
+    /**
+     * 根据 ids 查询食客信息
+     *
+     * @param ids
+     * @return
+     */
+    @GetMapping("findByIds")
+    public ResultInfo<List<ShortDinerInfo>> findByIds(String ids) {
+        List<ShortDinerInfo> dinerInfos = dinersService.findByIds(ids);
+        return ResultInfoUtil.buildSuccess(request.getServletPath(), dinerInfos);
+    }
 
     /**
      * 用户注册
