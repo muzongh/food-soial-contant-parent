@@ -16,6 +16,7 @@ public class FollowController {
 
     @Resource
     private FollowService followService;
+    
     @Resource
     private HttpServletRequest request;
 
@@ -34,6 +35,32 @@ public class FollowController {
         ResultInfo resultInfo = followService.follow(followDinerId,
                 isFollowed, access_token, request.getServletPath());
         return resultInfo;
+    }
+
+    /**
+     * 共同关注列表
+     *
+     * @param dinerId
+     * @param access_token
+     * @return
+     */
+    @GetMapping("commons/{dinerId}")
+    public ResultInfo findCommonsFriends(@PathVariable Integer dinerId,String access_token){
+
+        return followService.findCommonsFriends(dinerId,access_token,request.getServletPath());
+
+    }
+
+    /**
+     * 获取登陆用户关注列表或者粉丝列表
+     *
+     * @param access_token
+     * @param followType 0：关注列表，1：粉丝列表
+     * @return
+     */
+    @PostMapping("followingOrFollowerList")
+    public ResultInfo followingOrFollowerList(String access_token,String followType){
+        return followService.followingOrFollowerList(access_token,request.getServletPath(),followType);
     }
 
 }

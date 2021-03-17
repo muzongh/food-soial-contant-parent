@@ -7,12 +7,15 @@ import com.mzh.commons.constant.RedisKeyConstant;
 import com.mzh.commons.exception.ParameterException;
 import com.mzh.commons.model.domain.ResultInfo;
 import com.mzh.commons.model.pojo.Follow;
+import com.mzh.commons.model.vo.ShortDinerInfo;
 import com.mzh.commons.model.vo.SignInDinerInfo;
 import com.mzh.commons.utils.AssertUtil;
 import com.mzh.commons.utils.ResultInfoUtil;
 import com.mzh.follow.mapper.FollowMapper;
+import com.mzh.follow.utils.UserUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -30,16 +33,48 @@ import java.util.stream.Collectors;
 @Service
 public class FollowService {
 
-    @Value("${service.name.ms-oauth-server}")
-    private String oauthServerName;
-    @Value("${service.name.ms-diners-server}")
-    private String dinersServerName;
     @Resource
     private RestTemplate restTemplate;
+
     @Resource
     private FollowMapper followMapper;
+
     @Resource
     private RedisTemplate redisTemplate;
+
+    /**
+     * 共同关注列表
+     *
+     * @param dinerId
+     * @param accessToken
+     * @param path
+     * @return
+     */
+    public ResultInfo findCommonsFriends(Integer dinerId,String accessToken,String path){
+
+        AssertUtil.isTrue(dinerId == null || dinerId < 1,
+                "请选择要查看的人");
+
+        //获取用户登陆信息
+        SignInDinerInfo signInDinerInfo = UserUtils.loadSignInDinerInfo(accessToken);
+
+        //获取登陆用户关注信息
+        String loginDinerKey=RedisKeyConstant.following.getKey() + signInDinerInfo.getId();
+
+        //获取登陆用户查看用户的关注信息
+        String dinerKey = RedisKeyConstant.following.getKey() + dinerId;
+
+        //计算交集
+        Set<Integer> intersect = redisTemplate.opsForSet().intersect(loginDinerKey, dinerKey);
+
+        if (intersect == null || intersect.isEmpty()){
+            return  ResultInfoUtil.buildSuccess(path,new ArrayList<ShortDinerInfo>());
+        }
+        List<ShortDinerInfo> shortDinerInfos = UserUtils.loadDinerMessageByIds(accessToken, StrUtil.join(",", intersect));
+
+        return ResultInfoUtil.buildSuccess(path,shortDinerInfos);
+
+    }
 
     /**
      * 关注/取关
@@ -56,7 +91,7 @@ public class FollowService {
         AssertUtil.isTrue(followDinerId == null || followDinerId < 1,
                 "请选择要关注的人");
         // 获取登录用户信息 (封装方法)
-        SignInDinerInfo dinerInfo = loadSignInDinerInfo(accessToken);
+        SignInDinerInfo dinerInfo = UserUtils.loadSignInDinerInfo(accessToken);
         // 获取当前登录用户与需要关注用户的关注信息
         Follow follow = followMapper.selectFollow(dinerInfo.getId(), followDinerId);
 
@@ -100,6 +135,30 @@ public class FollowService {
     }
 
     /**
+     * 关注列表
+     *
+     * @param accessToken
+     * @param path
+     * @param followType
+     * @return
+     */
+    public ResultInfo followingOrFollowerList(String accessToken,String path,String followType){
+
+        AssertUtil.isNotEmpty(followType,"请选择要查询的列表类别");
+        AssertUtil.isTrue(!followType.equals("1") && !followType.equals("0"),"请选择正确的列表类型");
+        //获取当前用户登陆信息
+        SignInDinerInfo signInDinerInfo = UserUtils.loadSignInDinerInfo(accessToken);
+        String dinerKey= ("0".equals(followType)
+                ? RedisKeyConstant.following.getKey()
+                : RedisKeyConstant.followers.getKey() )
+                + signInDinerInfo.getId();
+        Set<Integer> members = redisTemplate.opsForSet().members(dinerKey);
+        List<ShortDinerInfo> shortDinerInfos = UserUtils.loadDinerMessageByIds(accessToken, StrUtil.join(",", members));
+        return ResultInfoUtil.buildSuccess(path,shortDinerInfos);
+
+    }
+
+    /**
      * 添加关注列表到 Redis
      *
      * @param dinerId
@@ -119,25 +178,6 @@ public class FollowService {
     private void removeFromRedisSet(Integer dinerId, Integer followDinerId) {
         redisTemplate.opsForSet().remove(RedisKeyConstant.following.getKey() + dinerId, followDinerId);
         redisTemplate.opsForSet().remove(RedisKeyConstant.followers.getKey() + followDinerId, dinerId);
-    }
-
-    /**
-     * 获取登录用户信息
-     *
-     * @param accessToken
-     * @return
-     */
-    private SignInDinerInfo loadSignInDinerInfo(String accessToken) {
-        // 必须登录
-        AssertUtil.mustLogin(accessToken);
-        String url = oauthServerName + "user/me?access_token={accessToken}";
-        ResultInfo resultInfo = restTemplate.getForObject(url, ResultInfo.class, accessToken);
-        if (resultInfo.getCode() != ApiConstant.SUCCESS_CODE) {
-            throw new ParameterException(resultInfo.getMessage());
-        }
-        SignInDinerInfo dinerInfo = BeanUtil.fillBeanWithMap((LinkedHashMap) resultInfo.getData(),
-                new SignInDinerInfo(), false);
-        return dinerInfo;
     }
 
 }
