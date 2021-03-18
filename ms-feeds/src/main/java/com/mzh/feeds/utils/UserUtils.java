@@ -59,6 +59,9 @@ public class UserUtils {
         }
         SignInDinerInfo dinerInfo = BeanUtil.fillBeanWithMap((LinkedHashMap) resultInfo.getData(),
                 new SignInDinerInfo(), false);
+        if (dinerInfo == null){
+            throw new ParameterException(ApiConstant.NO_LOGIN_CODE, ApiConstant.NO_LOGIN_MESSAGE);
+        }
         return dinerInfo;
     }
 
