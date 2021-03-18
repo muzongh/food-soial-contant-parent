@@ -66,6 +66,38 @@ public class FeedsService {
     }
 
     /**
+     * 删除feed
+     *
+     * @param id
+     * @param accessToken
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteFeed(Integer id,String accessToken){
+
+        AssertUtil.isTrue(id == null || id < 1 , "请选择要删除的动态");
+
+        SignInDinerInfo signInDinerInfo = UserUtils.loadSignInDinerInfo(accessToken);
+
+        Feeds byId = feedsMapper.findById(id);
+
+        AssertUtil.isTrue(byId == null,"该动态已被删除!");
+        AssertUtil.isTrue(byId.getFkDinerId() != signInDinerInfo.getId(),"只能删除自己的动态！");
+
+        int delete = feedsMapper.delete(id);
+        if (delete == 0){
+            return;
+        }
+        List<Integer> followerIds = findFollowers(signInDinerInfo.getId());
+        //推送feed
+        Long now = System.currentTimeMillis();
+        followerIds.forEach(followerId->{
+            String key = RedisKeyConstant.following_feeds.getKey() + followerId;
+            redisTemplate.opsForSet().remove(key, id);
+        });
+
+    }
+
+    /**
      * 获取粉丝ID集合
      *
      * @param dinerId
