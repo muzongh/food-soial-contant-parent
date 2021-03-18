@@ -1,10 +1,15 @@
 package com.mzh.feeds.service;
 
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.StrUtil;
+import com.google.common.collect.Lists;
 import com.mzh.commons.constant.ApiConstant;
 import com.mzh.commons.constant.RedisKeyConstant;
 import com.mzh.commons.exception.ParameterException;
 import com.mzh.commons.model.domain.ResultInfo;
 import com.mzh.commons.model.pojo.Feeds;
+import com.mzh.commons.model.vo.FeedsVO;
+import com.mzh.commons.model.vo.ShortDinerInfo;
 import com.mzh.commons.model.vo.SignInDinerInfo;
 import com.mzh.commons.utils.AssertUtil;
 import com.mzh.feeds.mapper.FeedsMapper;
@@ -18,7 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -128,6 +135,48 @@ public class FeedsService {
             redisTemplate.opsForZSet().add(key, typedTuples);
         }
 
+    }
+
+    /**
+     * 根据时间由远及近，每次查询20条
+     *
+     * @param page
+     * @param accessToken
+     * @return
+     */
+    public List<FeedsVO> selectForPage(Integer page, String accessToken) {
+        if (page == null || page < 1) {
+            page = 1;
+        }
+        SignInDinerInfo signInDinerInfo = UserUtils.loadSignInDinerInfo(accessToken);
+        String key = RedisKeyConstant.following_feeds.getKey() + signInDinerInfo.getId();
+
+        long start = (page - 1) * ApiConstant.PAGE_SIZE;
+        long end = page * ApiConstant.PAGE_SIZE - 1;
+        Set<Integer> feedIds = redisTemplate.opsForZSet().reverseRange(key, start, end);
+        if (feedIds == null || feedIds.isEmpty()) {
+            return Lists.newArrayList();
+        }
+        List<Feeds> feedsByIds = feedsMapper.findFeedsByIds(feedIds);
+        List<Integer> followingIds = new ArrayList<>();
+        List<FeedsVO> feedsVOS = feedsByIds.stream().map(feed -> {
+            FeedsVO feedsVO = new FeedsVO();
+            BeanUtil.copyProperties(feed, feedsVO);
+            followingIds.add(feed.getFkDinerId());
+            return feedsVO;
+        }).collect(Collectors.toList());
+        List<ShortDinerInfo> shortDinerInfos = UserUtils.loadDinerMessageByIds(accessToken, StrUtil.join(",", followingIds));
+        //stream处理成Map<Integer, ShortDinerInfo>
+        Map<Integer, ShortDinerInfo> shortDinerInfoMap = shortDinerInfos.stream().collect(Collectors.toMap(
+                //KEY
+                shortDinerInfo -> shortDinerInfo.getId(),
+                //VALUE
+                shortDinerInfo -> shortDinerInfo
+        ));
+        feedsVOS.forEach(feedsVO -> {
+            feedsVO.setDinerInfo(shortDinerInfoMap.get(feedsVO.getFkDinerId()));
+        });
+        return feedsVOS;
     }
 
     /**

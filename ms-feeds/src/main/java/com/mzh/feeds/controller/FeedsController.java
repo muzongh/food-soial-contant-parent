@@ -2,12 +2,14 @@ package com.mzh.feeds.controller;
 
 import com.mzh.commons.model.domain.ResultInfo;
 import com.mzh.commons.model.pojo.Feeds;
+import com.mzh.commons.model.vo.FeedsVO;
 import com.mzh.commons.utils.ResultInfoUtil;
 import com.mzh.feeds.service.FeedsService;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 @RestController
 @RequestMapping("/feeds")
@@ -27,9 +29,9 @@ public class FeedsController {
      * @return
      */
     @PostMapping("createFeeds")
-    public ResultInfo createFeeds(@RequestBody Feeds feeds,String access_token){
-        feedsService.createFeed(feeds,access_token);
-        return ResultInfoUtil.buildSuccess(httpServletRequest.getServletPath(),"创建成功");
+    public ResultInfo createFeeds(@RequestBody Feeds feeds, String access_token) {
+        feedsService.createFeed(feeds, access_token);
+        return ResultInfoUtil.buildSuccess(httpServletRequest.getServletPath(), "创建成功");
     }
 
     /**
@@ -40,9 +42,9 @@ public class FeedsController {
      * @return
      */
     @DeleteMapping("deleteFeed/{id}")
-    public ResultInfo deleteFeed(@PathVariable Integer id,String access_token){
-        feedsService.deleteFeed(id,access_token);
-        return ResultInfoUtil.buildSuccess(httpServletRequest.getServletPath(),"删除成功");
+    public ResultInfo deleteFeed(@PathVariable Integer id, String access_token) {
+        feedsService.deleteFeed(id, access_token);
+        return ResultInfoUtil.buildSuccess(httpServletRequest.getServletPath(), "删除成功");
     }
 
     /**
@@ -50,13 +52,26 @@ public class FeedsController {
      *
      * @param followingDinerId
      * @param access_token
-     * @param type 1 关注；0 取关
+     * @param type             1 关注；0 取关
      * @return
      */
     @PostMapping("changeFollowingFeed/{followingDinerId}")
-    public ResultInfo changeFollowingFeed(@PathVariable Integer followingDinerId, String access_token, Integer type){
-        feedsService.changeFollowingFeed(followingDinerId,access_token,type);
-        return ResultInfoUtil.buildSuccess(httpServletRequest.getServletPath(),"操作成功");
+    public ResultInfo changeFollowingFeed(@PathVariable Integer followingDinerId, String access_token, Integer type) {
+        feedsService.changeFollowingFeed(followingDinerId, access_token, type);
+        return ResultInfoUtil.buildSuccess(httpServletRequest.getServletPath(), "操作成功");
+    }
+
+    /**
+     * 根据时间由远及近，每次查询20条
+     *
+     * @param page
+     * @param access_token
+     * @return
+     */
+    @GetMapping("selectForPage/{page}")
+    public ResultInfo selectForPage(@PathVariable Integer page, String access_token) {
+        List<FeedsVO> feedsVOS = feedsService.selectForPage(page, access_token);
+        return ResultInfoUtil.buildSuccess(httpServletRequest.getServletPath(), feedsVOS);
     }
 
 }

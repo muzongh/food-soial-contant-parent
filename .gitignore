@@ -32,7 +32,6 @@ hs_err_pid*
 *.iml
 out
 gen
-commons/src/main/resources/
 commons/target/
 ms-diners/target/
 ms-feeds/target/
