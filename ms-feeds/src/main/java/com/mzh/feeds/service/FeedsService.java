@@ -59,7 +59,7 @@ public class FeedsService {
         Long now = System.currentTimeMillis();
         followerIds.forEach(followerId->{
             String key = RedisKeyConstant.following_feeds.getKey() + followerId;
-            redisTemplate.opsForSet().add(key, feeds.getId() , now);
+            redisTemplate.opsForZSet().add(key, feeds.getId() , now);
         });
 
 
