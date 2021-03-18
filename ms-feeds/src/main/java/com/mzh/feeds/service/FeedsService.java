@@ -10,13 +10,17 @@ import com.mzh.commons.utils.AssertUtil;
 import com.mzh.feeds.mapper.FeedsMapper;
 import com.mzh.feeds.utils.UserUtils;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.DefaultTypedTuple;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import javax.annotation.Resource;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class FeedsService {
@@ -40,26 +44,26 @@ public class FeedsService {
      * @param accessToken
      */
     @Transactional(rollbackFor = Exception.class)
-    public void createFeed(Feeds feeds,String accessToken){
+    public void createFeed(Feeds feeds, String accessToken) {
 
         //校验参数
-        AssertUtil.isNotEmpty(feeds.getContent(),"请输入内容");
-        AssertUtil.isTrue(feeds.getContent().length()>100,"输入内容过多！");
+        AssertUtil.isNotEmpty(feeds.getContent(), "请输入内容");
+        AssertUtil.isTrue(feeds.getContent().length() > 100, "输入内容过多！");
         //获取用户登陆信息
         SignInDinerInfo signInDinerInfo = UserUtils.loadSignInDinerInfo(accessToken);
         //feed关联用户信息
         feeds.setFkDinerId(signInDinerInfo.getId());
         //添加feed
         int save = feedsMapper.save(feeds);
-        AssertUtil.isTrue(save == 0,"添加失败，请稍后再试");
+        AssertUtil.isTrue(save == 0, "添加失败，请稍后再试");
         //推送到粉丝的列表里 --FIXME 后续使用异步消息队列解决性能问题
         //获取登陆用户粉丝列表
         List<Integer> followerIds = findFollowers(signInDinerInfo.getId());
         //推送feed
         Long now = System.currentTimeMillis();
-        followerIds.forEach(followerId->{
+        followerIds.forEach(followerId -> {
             String key = RedisKeyConstant.following_feeds.getKey() + followerId;
-            redisTemplate.opsForZSet().add(key, feeds.getId() , now);
+            redisTemplate.opsForZSet().add(key, feeds.getId(), now);
         });
 
 
@@ -72,28 +76,57 @@ public class FeedsService {
      * @param accessToken
      */
     @Transactional(rollbackFor = Exception.class)
-    public void deleteFeed(Integer id,String accessToken){
+    public void deleteFeed(Integer id, String accessToken) {
 
-        AssertUtil.isTrue(id == null || id < 1 , "请选择要删除的动态");
+        AssertUtil.isTrue(id == null || id < 1, "请选择要删除的动态");
 
         SignInDinerInfo signInDinerInfo = UserUtils.loadSignInDinerInfo(accessToken);
 
         Feeds byId = feedsMapper.findById(id);
 
-        AssertUtil.isTrue(byId == null,"该动态已被删除!");
-        AssertUtil.isTrue(byId.getFkDinerId() != signInDinerInfo.getId(),"只能删除自己的动态！");
+        AssertUtil.isTrue(byId == null, "该动态已被删除!");
+        AssertUtil.isTrue(byId.getFkDinerId() != signInDinerInfo.getId(), "只能删除自己的动态！");
 
         int delete = feedsMapper.delete(id);
-        if (delete == 0){
+        if (delete == 0) {
             return;
         }
         List<Integer> followerIds = findFollowers(signInDinerInfo.getId());
         //推送feed
-        Long now = System.currentTimeMillis();
-        followerIds.forEach(followerId->{
+        followerIds.forEach(followerId -> {
             String key = RedisKeyConstant.following_feeds.getKey() + followerId;
-            redisTemplate.opsForSet().remove(key, id);
+            redisTemplate.opsForZSet().remove(key, id);
         });
+
+    }
+
+    /**
+     * 变更feed流
+     *
+     * @param followingDinerId 取关/关注用户ID
+     * @param accessToken      登陆用户Token
+     * @param type             1 关注；0 取关
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void changeFollowingFeed(Integer followingDinerId, String accessToken, Integer type) {
+        AssertUtil.isTrue(followingDinerId == null || followingDinerId < 1, "请选择需要操作的用户！");
+        AssertUtil.isTrue(type != 0 && type != 1, "请选择正确的操作类型！");
+        SignInDinerInfo signInDinerInfo = UserUtils.loadSignInDinerInfo(accessToken);
+
+        List<Feeds> byDinerIdFeeds = feedsMapper.findByDinerId(followingDinerId);
+
+        String key = RedisKeyConstant.following_feeds.getKey() + signInDinerInfo.getId();
+        if (type == 0) {
+            //取关
+            List<Integer> feedIds = byDinerIdFeeds.stream().map(feed -> feed.getId()).collect(Collectors.toList());
+            redisTemplate.opsForZSet().remove(key, feedIds.toArray(new Integer[]{}));
+        } else {
+            //关注
+            Set<ZSetOperations.TypedTuple> typedTuples = byDinerIdFeeds.stream()
+                    .map(feed -> new DefaultTypedTuple<>(feed.getId(), (double) feed.getUpdateDate().getTime()))
+                    .collect(Collectors.toSet());
+            redisTemplate.opsForZSet().add(key, typedTuples);
+        }
 
     }
 
@@ -103,11 +136,11 @@ public class FeedsService {
      * @param dinerId
      * @return
      */
-    private List<Integer> findFollowers(Integer dinerId){
+    private List<Integer> findFollowers(Integer dinerId) {
         String url = msFollowServer + "/follow/findFollowerIds/" + dinerId;
         ResultInfo resultInfo = restTemplate.getForObject(url, ResultInfo.class, true);
-        if (resultInfo.getCode() != ApiConstant.SUCCESS_CODE){
-            throw new ParameterException(resultInfo.getCode(),resultInfo.getMessage());
+        if (resultInfo.getCode() != ApiConstant.SUCCESS_CODE) {
+            throw new ParameterException(resultInfo.getCode(), resultInfo.getMessage());
         }
         List<Integer> followerIds = (List<Integer>) resultInfo.getData();
         return followerIds;

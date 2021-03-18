@@ -14,7 +14,7 @@ spring:
   redis:
     # 启用哨兵模式以后无需直接连接 Redis，通过哨兵可以获得主从信息
     port: 6379
-    host: 192.168.131.1
+    host: 127.0.0.1
     timeout: 3000 # 连接超时时间
     password: 123456 # Redis 服务器密码
     database: 2

@@ -13,7 +13,7 @@ spring:
   # Redis
   redis:
     port: 6379
-    host: 192.168.131.1
+    host: 127.0.0.1
     timeout: 3000
     password: 123456
     database: 2
@@ -35,6 +35,7 @@ service:
   name:
     ms-oauth-server: http://ms-oauth2-server/
     ms-diners-server: http://ms-diners/
+    ms-feeds-server: http://ms-feeds/
 
 mybatis:
   configuration:

@@ -12,6 +12,7 @@ import com.mzh.commons.model.vo.SignInDinerInfo;
 import com.mzh.commons.utils.AssertUtil;
 import com.mzh.commons.utils.ResultInfoUtil;
 import com.mzh.follow.mapper.FollowMapper;
+import com.mzh.follow.utils.FeedsUtils;
 import com.mzh.follow.utils.UserUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -32,9 +33,6 @@ import java.util.stream.Collectors;
  */
 @Service
 public class FollowService {
-
-    @Resource
-    private RestTemplate restTemplate;
 
     @Resource
     private FollowMapper followMapper;
@@ -98,6 +96,7 @@ public class FollowService {
      * @param path          访问地址
      * @return
      */
+    @Transactional(rollbackFor = Exception.class)
     public ResultInfo follow(Integer followDinerId, int isFollowed,
                              String accessToken, String path) {
         // 是否选择了关注对象
@@ -116,6 +115,7 @@ public class FollowService {
             if (count == 1) {
                 addToRedisSet(dinerInfo.getId(), followDinerId);
             }
+            FeedsUtils.sendSaveOrRemoveFeed(followDinerId,accessToken,1);
             return ResultInfoUtil.build(ApiConstant.SUCCESS_CODE,
                     "关注成功", path, "关注成功");
         }
@@ -128,6 +128,7 @@ public class FollowService {
             if (count == 1) {
                 removeFromRedisSet(dinerInfo.getId(), followDinerId);
             }
+            FeedsUtils.sendSaveOrRemoveFeed(followDinerId,accessToken,0);
             return ResultInfoUtil.build(ApiConstant.SUCCESS_CODE,
                     "成功取关", path, "成功取关");
         }
@@ -140,6 +141,7 @@ public class FollowService {
             if (count == 1) {
                 addToRedisSet(dinerInfo.getId(), followDinerId);
             }
+            FeedsUtils.sendSaveOrRemoveFeed(followDinerId,accessToken,1);
             return ResultInfoUtil.build(ApiConstant.SUCCESS_CODE,
                     "关注成功", path, "关注成功");
         }

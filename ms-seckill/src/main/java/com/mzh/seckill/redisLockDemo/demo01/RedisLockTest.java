@@ -39,7 +39,7 @@ public class RedisLockTest {
         JedisPoolConfig jedisPoolConfig = new JedisPoolConfig();
         jedisPoolConfig.setMinIdle(1);
         jedisPoolConfig.setMaxTotal(5);
-        JedisPool jedisPool = new JedisPool(jedisPoolConfig, "192.168.131.1",
+        JedisPool jedisPool = new JedisPool(jedisPoolConfig, "127.0.0.1",
                 6379, 1000, "123456");
         Thread thread1 = new Thread(() -> {
             redisLockTest.call(jedisPool.getResource());
