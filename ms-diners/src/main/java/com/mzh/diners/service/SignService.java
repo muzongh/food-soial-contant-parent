@@ -1,18 +1,23 @@
 package com.mzh.diners.service;
 
 import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.date.LocalDateTimeUtil;
 import cn.hutool.core.util.StrUtil;
 import com.mzh.commons.exception.ParameterException;
 import com.mzh.commons.model.vo.SignInDinerInfo;
 import com.mzh.commons.utils.AssertUtil;
 import com.mzh.diners.utils.UserUtils;
 import org.springframework.data.redis.connection.BitFieldSubCommands;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 @Service
 public class SignService {
@@ -42,9 +47,71 @@ public class SignService {
         Boolean isSigned = redisTemplate.opsForValue().getBit(key, offset);
         AssertUtil.isTrue(isSigned, "今天已签到完成，无需再签");
         redisTemplate.opsForValue().setBit(key, offset, true);
-        return getSignCount(signInDinerInfo.getId(), date);
+        return getContinuousSignCount(signInDinerInfo.getId(), date);
 
     }
+
+    /**
+     * 获取用户签到天数
+     *
+     * @param accessToken
+     * @param dateStr
+     * @return
+     */
+    public Long getSignCount(String accessToken, String dateStr) {
+        SignInDinerInfo signInDinerInfo = UserUtils.loadSignInDinerInfo(accessToken);
+        Date date = null;
+        try {
+            date = StrUtil.isNotBlank(dateStr) ? DateUtil.parseDate(dateStr) : new Date();
+        } catch (Exception e) {
+            throw new ParameterException("请传入YYYY-MM-DD的日期类型！");
+        }
+        String key = buildSignKey(signInDinerInfo.getId(), date);
+        return (Long) redisTemplate.execute(
+                (RedisCallback<Long>) con -> con.bitCount(key.getBytes())
+        );
+    }
+
+    /**
+     * 获取用户当月签到情况
+     *
+     * @param accessToken
+     * @param dateStr     查询日期 YYYY-MM-DD
+     * @return key为签到日期，value为签到状态得map
+     */
+    public Map<String, Boolean> getSignInfo(String accessToken, String dateStr) {
+        SignInDinerInfo signInDinerInfo = UserUtils.loadSignInDinerInfo(accessToken);
+        Date date = null;
+        try {
+            date = StrUtil.isNotBlank(dateStr) ? DateUtil.parseDate(dateStr) : new Date();
+        } catch (Exception e) {
+            throw new ParameterException("请传入YYYY-MM-DD的日期类型！");
+        }
+        String signKey = buildSignKey(signInDinerInfo.getId(), date);
+
+        Map<String, Boolean> signInfo = new TreeMap<>();
+        //获取某月得总天数
+        int dayOfMonth = DateUtil.lengthOfMonth(DateUtil.month(date) + 1, DateUtil.isLeapYear(DateUtil.year(date)));
+        //bitfield user:sign:5:202011 u30 0
+        BitFieldSubCommands bitFieldSubCommands = BitFieldSubCommands.create()
+                .get(BitFieldSubCommands.BitFieldType.unsigned(dayOfMonth))
+                .valueAt(0);
+        List<Long> list = redisTemplate.opsForValue().bitField(signKey, bitFieldSubCommands);
+        if (list == null || list.isEmpty()) {
+            return signInfo;
+        }
+        long v = list.get(0) == null ? 0 : list.get(0);
+        //从低位到高位进行遍历，为0表示未签到，为1表示已签到
+        for (int i = dayOfMonth; i > 0; i--) {
+            //yyyy-MM-dd true\false
+            LocalDateTime localDateTime = LocalDateTimeUtil.of(date).withDayOfMonth(i);
+            Boolean flag = v >> 1 << 1 != v;
+            signInfo.put(DateUtil.format(localDateTime, "yyyy-MM-dd"), flag);
+            v >>= 1;
+        }
+        return signInfo;
+    }
+
 
     /**
      * 构建签到KEY user:sign:{dinerId}:yyyyMM
@@ -64,7 +131,7 @@ public class SignService {
      * @param date
      * @return
      */
-    private Integer getSignCount(Integer dinerId, Date date) {
+    private Integer getContinuousSignCount(Integer dinerId, Date date) {
         int dayOfMonth = DateUtil.dayOfMonth(date);
         //构建key
         String signKey = buildSignKey(dinerId, date);
