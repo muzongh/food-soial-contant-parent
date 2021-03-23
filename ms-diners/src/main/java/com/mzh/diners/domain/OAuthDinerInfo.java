@@ -10,6 +10,7 @@ import java.util.List;
 @Setter
 public class OAuthDinerInfo implements Serializable {
 
+    private Integer id;
     private String nickname;
     private String avatarUrl;
     private String accessToken;

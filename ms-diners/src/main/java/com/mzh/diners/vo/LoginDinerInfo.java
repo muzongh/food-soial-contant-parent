@@ -12,5 +12,7 @@ public class LoginDinerInfo implements Serializable {
     private String nickname;
     private String token;
     private String avatarUrl;
+    private Long continuousLoginCount;
+    private Long loginCount;
 
 }

@@ -14,10 +14,8 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
+import java.util.function.Predicate;
 
 @Service
 public class SignService {
@@ -35,13 +33,7 @@ public class SignService {
     public Integer doSign(String accessToken, String dateStr) {
 
         SignInDinerInfo signInDinerInfo = UserUtils.loadSignInDinerInfo(accessToken);
-
-        Date date = null;
-        try {
-            date = StrUtil.isNotBlank(dateStr) ? DateUtil.parseDate(dateStr) : new Date();
-        } catch (Exception e) {
-            throw new ParameterException("请传入YYYY-MM-DD的日期类型！");
-        }
+        Date date = getDate(dateStr);
         int offset = DateUtil.dayOfMonth(date) - 1;
         String key = buildSignKey(signInDinerInfo.getId(), date);
         Boolean isSigned = redisTemplate.opsForValue().getBit(key, offset);
@@ -60,12 +52,7 @@ public class SignService {
      */
     public Long getSignCount(String accessToken, String dateStr) {
         SignInDinerInfo signInDinerInfo = UserUtils.loadSignInDinerInfo(accessToken);
-        Date date = null;
-        try {
-            date = StrUtil.isNotBlank(dateStr) ? DateUtil.parseDate(dateStr) : new Date();
-        } catch (Exception e) {
-            throw new ParameterException("请传入YYYY-MM-DD的日期类型！");
-        }
+        Date date = getDate(dateStr);
         String key = buildSignKey(signInDinerInfo.getId(), date);
         return (Long) redisTemplate.execute(
                 (RedisCallback<Long>) con -> con.bitCount(key.getBytes())
@@ -81,12 +68,7 @@ public class SignService {
      */
     public Map<String, Boolean> getSignInfo(String accessToken, String dateStr) {
         SignInDinerInfo signInDinerInfo = UserUtils.loadSignInDinerInfo(accessToken);
-        Date date = null;
-        try {
-            date = StrUtil.isNotBlank(dateStr) ? DateUtil.parseDate(dateStr) : new Date();
-        } catch (Exception e) {
-            throw new ParameterException("请传入YYYY-MM-DD的日期类型！");
-        }
+        Date date = getDate(dateStr);
         String signKey = buildSignKey(signInDinerInfo.getId(), date);
 
         Map<String, Boolean> signInfo = new TreeMap<>();
@@ -110,6 +92,40 @@ public class SignService {
             v >>= 1;
         }
         return signInfo;
+    }
+
+    /**
+     * 获取用户某月（默认当月）首次签到
+     *
+     * @param accessToken
+     * @param dateStr
+     * @return
+     */
+    public String getFirstSign(String accessToken, String dateStr) {
+        Map<String, Boolean> signInfo = getSignInfo(accessToken, dateStr);
+        Optional<Map.Entry<String, Boolean>> first = signInfo.entrySet().stream()
+                .filter(stringBooleanEntry -> stringBooleanEntry.getValue()).findFirst();
+        if (!first.isPresent()) {
+            return "9999-12-31";
+        }
+        return first.get().getKey();
+    }
+
+
+    /**
+     * 判断并转换日期格式
+     *
+     * @param dateStr
+     * @return
+     */
+    private Date getDate(String dateStr) {
+        Date date = null;
+        try {
+            date = StrUtil.isNotBlank(dateStr) ? DateUtil.parseDate(dateStr) : new Date();
+        } catch (Exception e) {
+            throw new ParameterException("请传入YYYY-MM-DD的日期类型！");
+        }
+        return date;
     }
 
 

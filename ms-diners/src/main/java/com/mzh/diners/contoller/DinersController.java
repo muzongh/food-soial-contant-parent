@@ -37,12 +37,13 @@ public class DinersController {
 
     /**
      * 用户注册
+     *
      * @param dinersDTO
      * @return
      */
     @PostMapping("register")
-    public ResultInfo register(@RequestBody DinersDTO dinersDTO){
-        return dinersService.register(dinersDTO,request.getServletPath());
+    public ResultInfo register(@RequestBody DinersDTO dinersDTO) {
+        return dinersService.register(dinersDTO, request.getServletPath());
     }
 
     /**
@@ -59,17 +60,30 @@ public class DinersController {
 
     /**
      * 登陆
+     *
      * @param account
      * @param password
      * @return
      */
     @GetMapping("/signIn")
-    public ResultInfo signIn(String account,String password){
+    public ResultInfo signIn(String account, String password) {
         try {
-            return dinersService.signIn(account,password,request.getServletPath());
+            return dinersService.signIn(account, password, request.getServletPath());
         } catch (Exception e) {
-            return ResultInfoUtil.buildError(0,e.getMessage(),request.getServletPath());
+            return ResultInfoUtil.buildError(0, e.getMessage(), request.getServletPath());
         }
+    }
+
+    /**
+     * 获取用户某月登陆天数（默认当月）
+     *
+     * @param access_token
+     * @param dateStr
+     * @return
+     */
+    @GetMapping("getLoginCount")
+    public ResultInfo getLoginCount(String access_token, String dateStr) {
+        return ResultInfoUtil.buildSuccess(request.getServletPath(), dinersService.getLoginCount(access_token, dateStr));
     }
 
 }

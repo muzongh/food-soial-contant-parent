@@ -90,6 +90,7 @@ public class AuthorizationServerConfiguration extends AuthorizationServerConfigu
                     SignInIdentity signInIdentity= (SignInIdentity) authentication.getPrincipal();
                     LinkedHashMap<String, Object> objectObjectLinkedHashMap = new LinkedHashMap<String, Object>();
                     objectObjectLinkedHashMap.put("nickname",signInIdentity.getNickname());
+                    objectObjectLinkedHashMap.put("id",signInIdentity.getId());
                     objectObjectLinkedHashMap.put("avatarUrl",signInIdentity.getAvatarUrl());
                     DefaultOAuth2AccessToken defaultOAuth2AccessToken= (DefaultOAuth2AccessToken) accessToken;
                     defaultOAuth2AccessToken.setAdditionalInformation(objectObjectLinkedHashMap);

@@ -25,13 +25,13 @@ public class SignController {
      * 签到
      *
      * @param access_token
-     * @param dateStr yyyyMMdd
+     * @param dateStr      yyyyMMdd
      * @return 连续签到天数
      */
     @PostMapping("doSign")
-    public ResultInfo doSign(String access_token,String dateStr){
+    public ResultInfo doSign(String access_token, String dateStr) {
         Integer integer = signService.doSign(access_token, dateStr);
-        return ResultInfoUtil.buildSuccess(httpServletRequest.getServletPath(),integer);
+        return ResultInfoUtil.buildSuccess(httpServletRequest.getServletPath(), integer);
     }
 
     /**
@@ -42,8 +42,8 @@ public class SignController {
      * @return
      */
     @GetMapping("getSignCount")
-    public ResultInfo getSignCount(String access_token,String dateStr){
-        return ResultInfoUtil.buildSuccess(httpServletRequest.getServletPath(),signService.getSignCount(access_token,dateStr));
+    public ResultInfo getSignCount(String access_token, String dateStr) {
+        return ResultInfoUtil.buildSuccess(httpServletRequest.getServletPath(), signService.getSignCount(access_token, dateStr));
     }
 
     /**
@@ -54,8 +54,21 @@ public class SignController {
      * @return
      */
     @GetMapping("getSignInfo")
-    public ResultInfo getSignInfo(String access_token,String dateStr){
-        return ResultInfoUtil.buildSuccess(httpServletRequest.getServletPath(),signService.getSignInfo(access_token,dateStr));
+    public ResultInfo getSignInfo(String access_token, String dateStr) {
+        return ResultInfoUtil.buildSuccess(httpServletRequest.getServletPath(), signService.getSignInfo(access_token, dateStr));
     }
+
+    /**
+     * 获取用户某月（默认当月）首次签到
+     *
+     * @param access_token
+     * @param dateStr
+     * @return
+     */
+    @GetMapping("getFirstSign")
+    public ResultInfo getFirstSign(String access_token, String dateStr) {
+        return ResultInfoUtil.buildSuccess(httpServletRequest.getServletPath(), signService.getFirstSign(access_token, dateStr));
+    }
+
 
 }
