@@ -38,5 +38,16 @@ public class PointsController {
         return ResultInfoUtil.buildSuccess(request.getServletPath(), "添加成功");
     }
 
+    /**
+     * 获取积分榜前20名，并返回个人排行榜位置
+     *
+     * @param access_token
+     * @return
+     */
+    @PostMapping("findDinerPointRank")
+    public ResultInfo findDinerPointRank(String access_token) {
+        return ResultInfoUtil.buildSuccess(request.getServletPath(), pointsService.findDinerPointRank(access_token));
+    }
+
 
 }

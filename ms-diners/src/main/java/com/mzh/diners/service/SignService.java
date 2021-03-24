@@ -3,25 +3,38 @@ package com.mzh.diners.service;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.date.LocalDateTimeUtil;
 import cn.hutool.core.util.StrUtil;
+import com.mzh.commons.constant.ApiConstant;
+import com.mzh.commons.constant.PointsTypeConstant;
 import com.mzh.commons.exception.ParameterException;
+import com.mzh.commons.model.domain.ResultInfo;
 import com.mzh.commons.model.vo.SignInDinerInfo;
 import com.mzh.commons.utils.AssertUtil;
 import com.mzh.diners.utils.UserUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.function.Predicate;
 
 @Service
 public class SignService {
 
+    @Value("${service.name.ms-points-server}")
+    private String pointsServerName;
+
     @Resource
     private RedisTemplate redisTemplate;
+
+    @Resource
+    private RestTemplate restTemplate;
 
     /**
      * 签到
@@ -39,7 +52,23 @@ public class SignService {
         Boolean isSigned = redisTemplate.opsForValue().getBit(key, offset);
         AssertUtil.isTrue(isSigned, "今天已签到完成，无需再签");
         redisTemplate.opsForValue().setBit(key, offset, true);
-        return getContinuousSignCount(signInDinerInfo.getId(), date);
+        Integer continuousSignCount = getContinuousSignCount(signInDinerInfo.getId(), date);
+        Integer points = 0;
+        switch (continuousSignCount) {
+            case 1:
+                points = 10;
+                break;
+            case 2:
+                points = 20;
+                break;
+            case 3:
+                points = 30;
+                break;
+            default:
+                points = 40;
+        }
+        Integer integer = addPoints(signInDinerInfo.getId(), points, PointsTypeConstant.SIGN.getValue());
+        return integer;
 
     }
 
@@ -173,6 +202,33 @@ public class SignService {
             v >>= 1;
         }
         return signCount;
+    }
+
+    /**
+     * 添加积分
+     * 积分类型： 0=签到，1=关注好友，2=添加feed，3=添加商户评论
+     *
+     * @param dinerId
+     * @param points
+     * @param types
+     * @return
+     */
+    private Integer addPoints(Integer dinerId, Integer points, Integer types) {
+        HttpHeaders httpHeaders = new HttpHeaders();
+        httpHeaders.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("dinerId", dinerId);
+        body.add("points", points);
+        body.add("types", types);
+        HttpEntity<MultiValueMap<String, Object>> entity = new HttpEntity<>(body, httpHeaders);
+        ResponseEntity<ResultInfo> resultInfoResponseEntity = restTemplate.postForEntity(pointsServerName + "/points/addPoints",
+                entity, ResultInfo.class);
+        AssertUtil.isTrue(resultInfoResponseEntity.getStatusCode() != HttpStatus.OK, "登陆失败！");
+        ResultInfo resultInfo = resultInfoResponseEntity.getBody();
+        if (resultInfo.getCode() != ApiConstant.SUCCESS_CODE) {
+            throw new ParameterException(resultInfo.getCode(), resultInfo.getMessage());
+        }
+        return points;
     }
 
 }
