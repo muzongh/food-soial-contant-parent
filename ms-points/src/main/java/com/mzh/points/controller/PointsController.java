@@ -44,9 +44,9 @@ public class PointsController {
      * @param access_token
      * @return
      */
-    @PostMapping("findDinerPointRank")
-    public ResultInfo findDinerPointRank(String access_token) {
-        return ResultInfoUtil.buildSuccess(request.getServletPath(), pointsService.findDinerPointRank(access_token));
+    @PostMapping("findDinerPointRankForRedis")
+    public ResultInfo findDinerPointRankForRedis(String access_token) {
+        return ResultInfoUtil.buildSuccess(request.getServletPath(), pointsService.findDinerPointRankForRedis(access_token));
     }
 
 
