@@ -70,6 +70,7 @@ secure:
       - /diners/diners/register
       - /diners/sendVerifyCode/send
       - /seckill/seckill/addSeckillVouchers
+      - /restaurants/restaurants/findById
 
 # 配置 Eureka Server 注册中心
 eureka:
