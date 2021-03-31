@@ -1,0 +1,14 @@
+1、书写脚本redis-rdb-copy-per-hour.sh
+
+2、开启linux定时任务
+systemctl status crond -- 查看定时任务是否开启
+systemctl start crond -- 启动定时任务
+
+3、打开crontab定时器
+crontab -e
+
+4、编写文件
+cron表达式 sh redis-rdb-copy-per-hour.sh的目录
+
+5、查看定时任务列表
+crontab -l
