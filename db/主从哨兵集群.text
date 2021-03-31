@@ -1,0 +1,59 @@
+主从：
+
+查看主从信息：info replication
+
+redis.conf
+主节点配置：
+从节点访问主节点密码
+masterauth 主节点密码
+从节点开始只读模式
+replica-read-only yes
+从节点额外新增配置：
+slaveof 主节点IP 主节点端口号
+
+===============================================================================================================
+
+哨兵：(三个起步，奇数)
+sentinel.conf
+#指示Sentinel去监视一个名为mymaster的主服务器
+sentinel monitor mymaster  主节点ID 主节点端口号 仲裁数值（若大于等于这个值，发起故障迁移）
+#访问主节点密码
+sentinel auth-pass mymaster 主节点密码
+#Sentinel认为服务器已经断线所需的毫秒数
+sentinel down-after-milliseconds mymaster 毫秒数（默认30000）
+#若Sentinel 在该配置内未完成failover操作，则认为本次失败
+sentinel failover-timeout mymaster 180000
+启动：
+redis-server sentinel.conf --sentinel
+or
+redis-sentinel sentinel.conf
+
+三个定时任务：
+1、1S，每个sentinel对其他的sentinel和redis节点发送PING
+2、2S，每个sentinel通过master节点的channel交换信息（发布\订阅）
+3、10S，每个sentinel对master和slavez执行info
+
+主观下线（SDOWN）：
+单个sentinel认为某个服务下线，找寻其他的节点，对这个服务进行主观下线判断，超过仲裁值之后进行ODOWN
+
+客观下线（ODOWN）：
+多个sentinel实例在对同一个服务做出SDOWN判断，并且通过命令相互交流后，得出服务器下线判断，然后开启failover
+
+新增sentinel：直接添加命令启动即可
+
+删除sentinel：
+停止要删除的sentinel进程
+sentinel reset * 向其他的所有的sentinel实例发送命令
+执行 sentinel master mastername 检查每个sentinel显示的sentinel数量是否一致
+
+删除旧的master或无法访问的salve：
+停止salve进程后，向所有的sentinel发送命令sentinel reset mastername
+
+故障迁移一致性
+分布式一致性算法，Raft共识算法
+
+
+===============================================================================================================
+
+
+
