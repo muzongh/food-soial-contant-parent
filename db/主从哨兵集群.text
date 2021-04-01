@@ -55,5 +55,38 @@ sentinel reset * 向其他的所有的sentinel实例发送命令
 
 ===============================================================================================================
 
+集群：
+可扩展性，高可用性，负载均衡，错误恢复
 
+#是否开启集群模式，默认no
+cluster-enabled yes
+#集群节点信息文件
+cluster-config-file 文件名
+#集群连接超时时间
+cluster-node-timeout 15000
+#集群节点IP
+cluster-announce-ip 192.168.1.101
+#集群节点映射端口
+cluster-announce-port 6371
+#集群节点总线端口
+cluster-announce-bus-port 16371
+--启动之后，执行命令
+redis-cli -a 123456 --cluster create IP:PORT --cluster-replicas 1
 
+集群常用命令：
+redis-cli -a 123456 --cluster check IP:port
+
+1、连接：
+redis-cli -c -a 123456 -h  IP -p port
+2、输入命令：
+cluster info --集群信息
+cluster nodes --节点信息
+
+集群环境测试：
+redis-cli -c -a 123456 -h  IP -p port
+
+从节点只读模式，需要连接上从节点，执行readonly命令
+
+redis-benchmark命令测试redis性能
+示例：
+redis-benchmark -a 123456 -h ip -p port -t set,get -r 1000000 -n 1000000 -c 1000
