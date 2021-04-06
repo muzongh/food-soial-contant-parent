@@ -90,3 +90,43 @@ redis-cli -c -a 123456 -h  IP -p port
 redis-benchmark命令测试redis性能
 示例：
 redis-benchmark -a 123456 -h ip -p port -t set,get -r 1000000 -n 1000000 -c 1000
+
+
+添加主节点命令：
+redis-cli.exe -a 123456 --cluster add-node 127.0.0.1:6377（要添加的节点IP:PORT） 127.0.0.1:6373（现有主节点的最后的slot的节点IP:PORT）
+--cluster-master-id 99f54a888e63b7dc9c7240fa561d59dc57323151（现有主节点的最后的slot的节点标识）
+
+添加主节点之后需要重新分片命令：
+redis-cli.exe -a 123456 --cluster reshard 192.168.43.173:6371 （要连接的节点，可以随便写集群中某个节点）
+--cluster-from ea94906002a1f65da7933e0c6ff6a5a81bf4c569（从哪个节点取槽） --cluster-to b6be248e9511b9ffc768bb045a527ec03792310d（分给哪个节点）
+--cluster-slots 2000 --cluster-yes(是否询问)
+
+添加从节点命令：
+redis-cli.exe -a 123456 --cluster add-node 127.0.0.1:6378（要添加得从节点）
+127.0.0.1:6377（添加给哪个主节点） --cluster-slave（节点主从状态） --cluster-master-id  b6be248e9511b9ffc768bb045a527ec03792310d（主节点ID）
+
+删除从节点：
+redis-cli.exe -a 123456 --cluster del-node 127.0.0.1:6378（从节点IP:PORT） 47f5523d38eba0599502b79babbe3de64206d4be(从节点ID)
+
+删除主节点：
+1、首先需要重新分片，然后执行删除命令del-node
+2、redis-cli.exe -a 123456 --cluster reshard 192.168.43.173:6371 （要连接的节点，可以随便写集群中某个节点），回车一步一步来
+
+MOVED转向（槽已经转移完场 ）、ASK转向（槽在转移过程中）（普通介入之后，使用ASKING命令{一次性的}）
+使用集群模式接入客户端
+
+集群故障转移：
+    自动故障转移：
+    手动故障转移：连接到要升级的节点 执行cluster failover
+
+RedisShark集群迁移工具：
+开源项目：https://github.com/alibaba/RedisShark
+中文文档：https://github.com/alibaba/RedisShark/wiki/
+官方编译包：https://github.com/alibaba/RedisShark/releases
+RedisFullCheck:迁移结果检查工具:
+开源项目：https://github.com/alibaba/RedisFullCheck
+中文文档：https://github.com/alibaba/RedisFullCheck/wiki/
+官方编译包：https://github.com/alibaba/RedisFullCheck/releases
+比较命令示例：
+redis-full-check -s "{源主节点IP:PORT}" --sourcepassword=123456(源节点密码) -t "{目标主节点IP:PORT}" --targetpassword=123456(目标节点密码)
+--comparemode=1(比较类型：1全量比较) --comparetimes=1(比较次数) --qps=10 --batchcount=100 --sourcedbtype=1 --targetdbtype=1
